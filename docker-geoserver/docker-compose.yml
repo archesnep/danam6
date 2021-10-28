@@ -1,0 +1,67 @@
+version: '2.1'
+
+services:
+  
+    geoserver:
+      image: kartoza/geoserver:2.17.0
+      container_name: geoserver
+      volumes:
+        - ./data_dir:/opt/geoserver/data_dir
+      ports:
+        - "127.0.0.1:8080:8080"
+      restart: on-failure
+      env_file:
+        - docker-env/geoserver.env
+      healthcheck:
+        test: curl --fail -s http://localhost:8080/ || exit 1
+        interval: 1m30s
+        timeout: 10s
+        retries: 3
+
+    nginx:
+      container_name: nginx
+      image: asisgtm/nginx:1.1
+      restart: unless-stopped
+      ports:
+        - '80:80'
+        - '443:443'
+      volumes:
+        - letsencrypt-acme-challenge:/var/www
+        - letsencrypt:/etc/letsencrypt
+        - ./install/entrypoint.sh:/install/entrypoint.sh
+        - ./install/nginx_base.conf:/install/nginx_base.conf
+      environment:
+        - NGINX_PROXY_MODE=local
+        - NGINX_PROTOCOL=strict-https
+        - LOCAL_PROXY_HOST=geoserver
+        - LOCAL_PROXY_PORT=8080
+        - DOMAIN_NAMES=danam-dev.cats.uni-heidelberg.de
+        - PUBLIC_MODE=True
+        #- STATIC_URL=/media
+        #- MEDIA_URL=/files/uploadedfiles
+        - TZ=PST
+      depends_on:
+        - geoserver
+    
+    letsencrypt:
+      container_name: letsencrypt
+      image: asisgtm/letsencrypt:1.0
+      volumes:
+        - letsencrypt-acme-challenge:/var/www
+        - letsencrypt:/etc/letsencrypt
+        - letsencrypt-log:/var/log/letsencrypt
+      command: get_certificate
+      environment:
+        - MODE=regular
+        - LETSENCRYPT_EMAIL=danamnhdp@gmail.com
+        - DOMAIN_NAMES=danam-dev.cats.uni-heidelberg.de
+        - PRODUCTION_MODE=True
+        - PERSISTENT_MODE=False
+        - TZ=PST
+volumes:
+  db-backups:
+  letsencrypt-acme-challenge:
+  geoserver-data:
+  geo-db-data:
+  letsencrypt:
+  letsencrypt-log:
